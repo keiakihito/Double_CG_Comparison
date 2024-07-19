@@ -3,22 +3,32 @@ format long g
 
 % Main script starts here
 % Set up 3 x 3 SPD matrix hardcoded
-fprintf('~~3 x 3 SPD matrix~~ \n');
-A = single([1.5004, 1.3293, 0.8439; 1.3293, 1.2436, 0.6936; 0.8439, 0.6936, 1.2935]);
-disp(A)
+fprintf('~~5 x 5  SPD matrix~~ \n');
+A = [
+    1.5004, 1.3293, 0.8439; 1.3293, 1.2436, 0.6936; 0.8439, 0.6936, 1.2935];
+
+
+A =[10.840188, 0.394383, 0.000000, 0.000000, 0.000000;
+        0.394383, 10.783099, 0.798440, 0.000000, 0.000000;
+        0.000000, 0.798440, 10.911648, 0.197551, 0.000000;
+        0.000000, 0.000000, 0.197551, 10.335223, 0.768230;
+        0.000000, 0.000000, 0.000000, 0.768230, 10.277775];
+% disp(A);
 
 % Set given vector b = [1, 1, 1]
-b = single([1; 1; 1]);
+bT =[-0.957936, 0.099025, -0.312390, -0.141889, 0.429427];
+b = bT';
+%disp(b);
 
 % Set up initial guess x_0 = [0, 0, 0]
-x_ans = single([0; 0; 0]);
-x_0 = single([0; 0; 0]);
+x_0 = b;
+%disp(x_0);
 
 % Set epsilon
-eps = single(1e-6);
+eps = 1e-6;
 
 % Max number of iterations
-maxItr = 27;
+maxItr = 5;
 
 % Solve Ax = b with manual CG implementation
 fprintf('Solve Ax = b with my_pcg()\n');
