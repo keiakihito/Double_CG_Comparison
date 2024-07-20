@@ -101,7 +101,6 @@ void pcgTest_Case1()
     double mtxB_h[] = {-0.957936, 0.099025, -0.312390, -0.141889, 0.429427};
 
     //(1) Allocate memory
-    // double* mtxA_d = NULL;
     double* mtxSolX_d = NULL;
     double* mtxB_d = NULL;
 
@@ -110,7 +109,6 @@ void pcgTest_Case1()
     CHECK(cudaMalloc((void**)&mtxB_d,  N * sizeof(double)));
 
     //(2) Copy value from host to device
-    // CHECK(cudaMemcpy(mtxA_d, mtxA_h, M * K * sizeof(double), cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(mtxSolX_d, mtxB_h, N * sizeof(double), cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(mtxB_d, mtxB_h, N * sizeof(double), cudaMemcpyHostToDevice));
 
@@ -137,7 +135,7 @@ void pcgTest_Case1()
 
     
     double twoNorms = validateCG(csrMtxA_h, N, mtxSolX_d, mtxB_d);
-    printf("\n\n= = 1st Column Vector 2 norms: %f = =\n\n", twoNorms);
+    printf("\n\n~~Valicate : r = b - A * x_sol ~~ \n = =  vector r 2 norms: %f = =\n\n", twoNorms);
 
 
     //()Free memeory

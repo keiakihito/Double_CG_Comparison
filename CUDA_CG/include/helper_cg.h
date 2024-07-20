@@ -218,10 +218,6 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
         }
         
 
-        //x_{i+1} <- x_{i} + alpha * d_{i}
-        checkCudaErrors(cublasDaxpy(cublasHandler, numOfA, &alph, dirc_d, 1, vecSolX_d, 1));
-
-
         //d <- s + ßd
         checkCudaErrors(cublasDscal(cublasHandler, numOfA, &bta, dirc_d, 1)); //d <- ßd
         checkCudaErrors(cublasDaxpy(cublasHandler, numOfA, &alpha, s_d, 1, dirc_d, 1)); // d <- s + d
@@ -241,7 +237,6 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
 
     CHECK(cudaFree(r_d));
     CHECK(cudaFree(s_d));
-    CHECK(cudaFree(vecSolX_d));
     CHECK(cudaFree(dirc_d));
     CHECK(cudaFree(q_d););
     
