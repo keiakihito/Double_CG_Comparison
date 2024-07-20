@@ -1,5 +1,5 @@
-#ifndef CUDA_HELPERS_H
-#define CUDA_HELPERS_H
+#ifndef CHECKS_H
+#define CHECKS_H
 
 #include <stdio.h>
 #include <cuda_runtime.h>
@@ -77,6 +77,16 @@ const char* cusparseGetErrorString(cusparseStatus_t err) {
     }
 }
 
+// Error checking macros for cudaMalloc
+#define CHECK(call){ \
+    const cudaError_t cuda_ret = call; \
+    if(cuda_ret != cudaSuccess){ \
+        printf("Error: %s:%d,  ", __FILE__, __LINE__ );\
+        printf("code: %d, reason: %s \n", cuda_ret, cudaGetErrorString(cuda_ret));\
+        exit(-1); \
+    }\
+}
+
 // Error checking macros for cublasStatus_t
 #define CHECK_CUBLAS(call) do { \
     cublasStatus_t err = call; \
@@ -104,13 +114,6 @@ const char* cusparseGetErrorString(cusparseStatus_t err) {
     } \
 } while (0)
 
-// Error checking macros for cudaError_t (used by cuBLAS operations like cublasDaxpy)
-#define CHECK_CUDA(call) do { \
-    cudaError_t err = call; \
-    if (err != cudaSuccess) { \
-        fprintf(stderr, "CUDA error at %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
-        exit(1); \
-    } \
-} while (0)
 
-#endif // CUDA_HELPERS_H
+
+#endif // CHEKS_H

@@ -8,25 +8,13 @@
 #include <sys/time.h>
 
 // helper function CUDA error checking and initialization
-#include "../helper_cuda.h"  
-
+#include "../utils/checks.h"  
 
 #include "../CSRMatrix.h"
 
-// // Forward Declarations of functions from helper_orth.h
-// void multiply_Den_ClmM_mtxT_mtx(cublasHandle_t cublasHandler, double* mtxA_d, double* mtxB_d, double* mtxC_d, int numOfRowA, int numOfClmA, int numOfClmB);
-// double* transpose_Den_Mtx(cublasHandle_t cublasHandler, double* mtxX_d, int numOfRow, int numOfClm);
 
-
-
-#define CHECK(call){ \
-    const cudaError_t cuda_ret = call; \
-    if(cuda_ret != cudaSuccess){ \
-        printf("Error: %s:%d,  ", __FILE__, __LINE__ );\
-        printf("code: %d, reason: %s \n", cuda_ret, cudaGetErrorString(cuda_ret));\
-        exit(-1); \
-    }\
-}
+// Time tracker for each iteration
+double myCPUTimer();
 
 template<typename T>
 void print_vector(const T *d_val, int size);
@@ -42,7 +30,15 @@ void initializeRandom(double mtxB_h[], int numOfRow, int numOfClm);
 
 // // = = = Function signatures = = = = 
 
-//Print vector loat
+// Time tracker for each iteration
+double myCPUTimer()
+{
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    return ((double)tp.tv_sec + (double)tp.tv_usec/1.0e6);
+}
+
+
 template<typename T>
 void print_vector(const T *d_val, int size) {
     // Allocate memory on the host
@@ -54,12 +50,13 @@ void print_vector(const T *d_val, int size) {
     }
 
     // Copy data from device to host
-    cudaError_t err = cudaMemcpy(check_r, d_val, size * sizeof(T), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(err));
-        free(check_r);
-        return;
-    }
+    // cudaError_t err = cudaMemcpy(check_r, d_val, size * sizeof(T), cudaMemcpyDeviceToHost);
+    CHECK(cudaMemcpy(check_r, d_val, size * sizeof(T), cudaMemcpyDeviceToHost));
+    // if (err != cudaSuccess) {
+    //     printf("cudaMemcpy failed: %s\n", cudaGetErrorString(err));
+    //     free(check_r);
+    //     return;
+    // }
     // Print the values to check them
     for (int i = 0; i < size; i++) {
             printf("%.10f \n", check_r[i]);
@@ -84,12 +81,13 @@ void print_mtx_clm_d(const T *mtx_d, int numOfRow, int numOfClm){
     }
 
     // Copy data from device to host
-    cudaError_t err = cudaMemcpy(check_r, mtx_d, numOfRow * numOfClm * sizeof(T), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(err));
-        free(check_r);
-        return;
-    }
+    CHECK(cudaMemcpy(check_r, mtx_d, numOfRow * numOfClm * sizeof(T), cudaMemcpyDeviceToHost));
+    // cudaError_t err = cudaMemcpy(check_r, mtx_d, numOfRow * numOfClm * sizeof(T), cudaMemcpyDeviceToHost);
+    // if (err != cudaSuccess) {
+    //     printf("cudaMemcpy failed: %s\n", cudaGetErrorString(err));
+    //     free(check_r);
+    //     return;
+    // }
 
     for (int rwWkr = 0; rwWkr < numOfRow; rwWkr++){
         for(int clWkr = 0; clWkr < numOfClm; clWkr++){
@@ -105,13 +103,13 @@ void print_mtx_clm_d(const T *mtx_d, int numOfRow, int numOfClm){
 //Initialize random values between -1 and 1
 void initializeRandom(double mtxB_h[], int numOfRow, int numOfClm)
 {
-	srand(time(NULL));
+    srand(time(NULL));
 
-	for (int wkr = 0; wkr < numOfRow * numOfClm; wkr++){
-		//Generate a random double between -1 and 1
-		double rndVal = ((double)rand() / RAND_MAX) * 2.0f - 1.0f;
-		mtxB_h[wkr] = rndVal;
-	}
+    for (int wkr = 0; wkr < numOfRow * numOfClm; wkr++){
+        //Generate a random double between -1 and 1
+        double rndVal = ((double)rand() / RAND_MAX) * 2.0f - 1.0f;
+        mtxB_h[wkr] = rndVal;
+    }
 } // end of initializeRandom
 
 
