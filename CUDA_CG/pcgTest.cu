@@ -11,29 +11,19 @@
 
 
 //Utilities
-#include "include/helper_debug.h"
-// helper function CUDA error checking and initialization
-#include "include/helper_cuda.h"  
-#include "include/helper_functions.h"
-#include "include/helper_cg.h"
-
-#define CHECK(call){ \
-    const cudaError_t cuda_ret = call; \
-    if(cuda_ret != cudaSuccess){ \
-        printf("Error: %s:%d,  ", __FILE__, __LINE__ );\
-        printf("code: %d, reason: %s \n", cuda_ret, cudaGetErrorString(cuda_ret));\
-        exit(-1); \
-    }\
-}
 
 
-// Time tracker for each iteration
-double myCPUTimer()
-{
-    struct timeval tp;
-    gettimeofday(&tp, NULL);
-    return ((double)tp.tv_sec + (double)tp.tv_usec/1.0e6);
-}
+//After refactor header files
+#include "include/utils/checks.h"
+#include "include/functions/helper.h"
+#include "include/functions/cuBLAS_util.h"
+#include "include/functions/cuSPARSE_util.h"
+#include "include/functions/cuSOLVER_util.h"
+#include "include/functions/pcg.h"
+#include "include/CSRMatrix.h"
+
+
+
 
 void pcgTest_Case1();
 void pcgTest_Case2();
@@ -46,8 +36,8 @@ int main(int argc, char** argv)
 {   
     printf("\n\n= = = = pcgTest.cu= = = = \n\n");
     
-    printf("\n\n🔍🔍🔍 Test Case 1 🔍🔍🔍\n\n");
-    pcgTest_Case1();
+    // printf("\n\n🔍🔍🔍 Test Case 1 🔍🔍🔍\n\n");
+    // pcgTest_Case1();
 
     // // printf("\n\n🔍🔍🔍 Test Case 2 🔍🔍🔍\n\n");
     // // pcgTest_Case2();
@@ -55,8 +45,8 @@ int main(int argc, char** argv)
     // printf("\n\n🔍🔍🔍 Test Case 3 🔍🔍🔍\n\n");
     // pcgTest_Case3();
 
-    // // printf("\n\n🔍🔍🔍 Test Case 4 🔍🔍🔍\n\n");
-    // // pcgTest_Case4();
+    printf("\n\n🔍🔍🔍 Test Case 4 🔍🔍🔍\n\n");
+    pcgTest_Case4();
 
     // // printf("\n\n🔍🔍🔍 Test Case 5 🔍🔍🔍\n\n");
     // // pcgTest_Case5();
@@ -149,3 +139,68 @@ void pcgTest_Case1()
 
 
 
+
+
+
+
+
+void pcgTest_Case4()
+{
+    const int N = 32768;
+
+
+
+    bool debug = false;
+
+    CSRMatrix csrMtxA_h = generateSparseSPDMatrixCSR(N);
+
+
+    double mtxB_h[N];
+    initializeRandom(mtxB_h, N, 1);
+
+    //(1) Allocate memory
+    double* mtxSolX_d = NULL;
+    double* mtxB_d = NULL;
+
+    // CHECK(cudaMalloc((void**)&mtxA_d,  M * K * sizeof(double)));
+    CHECK(cudaMalloc((void**)&mtxSolX_d,  N * sizeof(double)));
+    CHECK(cudaMalloc((void**)&mtxB_d,  N * sizeof(double)));
+
+    //(2) Copy value from host to device
+    CHECK(cudaMemcpy(mtxSolX_d, mtxB_h, N * sizeof(double), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(mtxB_d, mtxB_h, N * sizeof(double), cudaMemcpyHostToDevice));
+
+    if(debug){
+        printf("\n\n~~csrMtxA_h~~\n\n");
+        print_CSRMtx(csrMtxA_h);
+        printf("\n\n~~mtxSolX~~\n\n");
+        print_vector(mtxSolX_d, N);
+        printf("\n\n~~mtxB~~\n\n");
+        print_vector(mtxB_d, N);
+    }
+
+    //Solve AX = B with bfbcg method
+    pcg(csrMtxA_h, mtxSolX_d, mtxB_d, N);
+
+    if(debug){
+        printf("\n\n~~📝📝📝Approximate Solution Vector X📝📝📝~~\n\n");
+        print_vector(mtxSolX_d, N);
+    }
+
+    //Validate with r - b -Ax with 2 Norm
+
+    printf("\n\n~~🔍👀Validate Solution vector X 🔍👀~~");
+
+    
+    double twoNorms = validateCG(csrMtxA_h, N, mtxSolX_d, mtxB_d);
+    printf("\n\n~~Valicate : r = b - A * x_sol ~~ \n = =  vector r 2 norms: %f = =\n\n", twoNorms);
+
+
+    //()Free memeory
+    freeCSRMatrix(csrMtxA_h);
+    CHECK(cudaFree(mtxSolX_d));
+    CHECK(cudaFree(mtxB_d));
+
+
+
+} // end of tranposeTest_Case4
