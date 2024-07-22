@@ -20,15 +20,6 @@
 #include "cuBLAS_util.h"
 #include "cuSPARSE_util.h"
 
-// #define CHECK(call){ \
-//  const cudaError_t cuda_ret = call; \
-//  if(cuda_ret != cudaSuccess){ \
-//      printf("Error: %s:%d,  ", __FILE__, __LINE__ );\
-//      printf("code: %d, reason: %s \n", cuda_ret, cudaGetErrorString(cuda_ret));\
-//      exit(-1); \
-//  }\
-// }
-
 
 //Input:
 //Process: Conjugate Gradient
@@ -38,6 +29,7 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_h, double *vecB_h, int numOfA);
 
 void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
 {
+    double startTime, endTime;
     bool debug = false;
     const double THRESHOLD = 1e-6;
 
@@ -113,24 +105,27 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
     CHECK_CUBLAS(cublasDdot(cublasHandler, numOfA, r_d, 1, dirc_d, 1, &delta_new));
     //Save it for the relative residual calculation.
     initial_delta = delta_new;
-    // //✅
     if(debug){
         printf("\n\ndelta_new{0} = \n %f\n ", initial_delta);    
     }
     
     
-    int cntr = 1; // counter
-    const int MAX_ITR = 5;
+    int counter = 1; // counter
+    const int MAX_ITR = 100;
 
-    while(cntr <= MAX_ITR){
+    while(counter <= MAX_ITR){
 
-        printf("\n\n💫💫💫= = = Iteraion %d= = = 💫💫💫\n", cntr);
+        printf("\n\n💫💫💫= = = Iteraion %d= = = 💫💫💫\n", counter);
 
         
         //q <- Ad
-        // CHECK_CUBLAS(cublasSgemv(cublasHandle, CUBLAS_OP_N, N, N, &alpha, mtxA_d, N, dirc_d, strd_x, &beta, q_d, strd_y));
+        startTime = myCPUTimer();
         multiply_Sprc_Den_vec(cusparseHandler, csrMtxA, dirc_d, q_d);
-        // //✅
+        endTime = myCPUTimer();
+        if(counter == 1){
+            printf("\nq <- Ad: %f s \n", endTime - startTime);
+        }
+
         if(debug){
             printf("\nq = \n");
             print_vector(q_d, numOfA);
@@ -138,6 +133,7 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
         
 
         //dot <- d^{T} * q
+        startTime = myCPUTimer();
         CHECK_CUBLAS(cublasDdot(cublasHandler, numOfA, dirc_d, 1, q_d, 1, &dot));
         //✅
         if(debug){
@@ -147,22 +143,31 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
 
         //alpha(a) <- delta_{new} / dot // dot <- d^{T} * q 
         alph = delta_new / dot;
-        // //✅
+        endTime = myCPUTimer();
+        if(counter == 1){
+            printf("\nalpha <- delta_{new} / d^{T} * q: %f s \n", endTime - startTime);
+        }
+
         if(debug){
             printf("\nalpha = %f\n", alph);
         }
         
 
         //x_{i+1} <- x_{i} + alpha * d_{i}
+        startTime = myCPUTimer();
         CHECK_CUBLAS(cublasDaxpy(cublasHandler, numOfA, &alph, dirc_d, 1, vecSolX_d, 1));
-        // //✅
+        endTime = myCPUTimer();
+        if(counter == 1){
+            printf("\nx_{i+1} <- x_{i} + alpha * d_{i}: %f s \n", endTime - startTime);
+        }
+
         if(debug){
             printf("\nx_sol = \n");
             print_vector(vecSolX_d, numOfA);
         }
 
 
-        if(cntr % 50 == 0){
+        if(counter % 50 == 0){
             //r <- b -Ax Recompute
             CHECK(cudaMemcpy(r_d, vecB_d, sizeof(double) * numOfA, cudaMemcpyHostToDevice));
             den_vec_subtract_multiplly_Sprc_Den_vec(cusparseHandler, csrMtxA, vecSolX_d, r_d);
@@ -171,12 +176,15 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
                 print_vector(r_d, numOfA);
             }
         }else{
-            // Set -alpha
-            ngtAlph = -alph;
-
             //r_{i+1} <- r_{i} -alpha*q
+            startTime = myCPUTimer();
+            ngtAlph = -alph;
             CHECK_CUBLAS(cublasDaxpy(cublasHandler, numOfA, &ngtAlph, q_d, 1, r_d, 1));
-            //✅
+            endTime = myCPUTimer();
+            if(counter == 1){
+                printf("\nr_{i+1} <- r_{i} - alpha * q: %f s \n", endTime - startTime);
+            }
+
             if(debug){
                 printf("\n\nr = \n");
                 print_vector(r_d, numOfA);
@@ -185,23 +193,30 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
         }
 
         //s <- M * r
+        startTime = myCPUTimer();
         multiply_Sprc_Den_vec(cusparseHandler, csrMtxM, r_d, s_d);
-
+        endTime = myCPUTimer();
+        if(counter == 1){
+                printf("\ns <- M * r: %f s \n", endTime - startTime);
+            }
 
         // delta_old <- delta_new
         delta_old = delta_new;
-        //✅
-        // if(debug){
-        //     printf("\n\ndelta_old = %f\n", delta_old);
-        // }
-        
 
         // delta_new <- r' * s
+        // bta <- delta_new / delta_old
+        startTime = myCPUTimer();
         CHECK_CUBLAS(cublasDdot(cublasHandler, numOfA, r_d, 1, s_d, 1, &delta_new));
-        //✅
+        bta = delta_new / delta_old;
+        endTime = myCPUTimer();
+        if(counter == 1){
+            printf("\nbeta <- r' * s / delta_old: %f s \n", endTime - startTime);
+        }
         if(debug){
             printf("\n\ndelta_new = %f\n", delta_new);
+            printf("\nbta = %f\n", bta);
         }
+
 
         relative_residual = sqrt(delta_new)/sqrt(initial_delta);
         printf("\n\n🫥Relative residual = %f🫥\n", relative_residual);
@@ -210,24 +225,22 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
             printf("\n\n🌀🌀🌀CONVERGED🌀🌀🌀\n\n");
             break; 
         }
-
-        // bta <- delta_new / delta_old
-        bta = delta_new / delta_old;
-        //✅
-        if(debug){
-            printf("\nbta = %f\n", bta);
-        }
         
 
         //d <- s + ßd
+        startTime = myCPUTimer();
         CHECK_CUBLAS(cublasDscal(cublasHandler, numOfA, &bta, dirc_d, 1)); //d <- ßd
         CHECK_CUBLAS(cublasDaxpy(cublasHandler, numOfA, &alpha, s_d, 1, dirc_d, 1)); // d <- s + d
+        endTime = myCPUTimer();
+        if(counter == 1){
+            printf("\nd_{i+1} <- s + d_{i} * beta: %f s \n", endTime - startTime);
+        }
         if(debug){
             printf("\nd = \n");
             print_vector(dirc_d, numOfA);
         }
 
-        cntr++;
+        counter++;
     } // end of while
 
 
@@ -235,7 +248,7 @@ void pcg(CSRMatrix &csrMtxA, double *vecSolX_d, double *vecB_d, int numOfA)
 
     //(6) Free the GPU memory after use
     CHECK_CUBLAS(cublasDestroy(cublasHandler));
-
+    CHECK_CUSPARSE(cusparseDestroy(cusparseHandler));
     CHECK(cudaFree(r_d));
     CHECK(cudaFree(s_d));
     CHECK(cudaFree(dirc_d));
